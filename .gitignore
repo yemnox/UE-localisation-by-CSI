@@ -1,0 +1,19 @@
+# DeepMIMO scenario (21 GB) and generated datasets
+data/o1_3p5/
+o1_3p5/
+*.mat
+
+# Training checkpoints (final weights results/models.pt are tracked, 3.3 MB)
+checkpoints/
+*.ckpt
+*.pth
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# MATLAB / OS
+*.asv
+Thumbs.db
+.DS_Store
