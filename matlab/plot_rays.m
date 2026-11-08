@@ -2,7 +2,8 @@
 % Loads the interaction points of every path (inter_pos). This file is large
 % (~400 MB on disk), so the first load takes a while and needs a few GB of RAM.
 clear; close all;
-scen = fullfile(pwd, 'o1_3p5');
+root = fileparts(fileparts(mfilename('fullpath')));   % repo root
+scen = fullfile(root, 'data', 'o1_3p5');
 TX = 6; GRID = 0;
 
 rx  = dm_load(scen, 'rx_pos', TX, GRID);
@@ -54,4 +55,4 @@ for k = 1:2
     colormap(parula); cb = colorbar; cb.Label.String = 'relative path power';
     view(35, 30); axis equal;
 end
-exportgraphics(gcf, 'rays.png', 'Resolution', 200);
+exportgraphics(gcf, fullfile(root, 'figs', 'rays.png'), 'Resolution', 200);

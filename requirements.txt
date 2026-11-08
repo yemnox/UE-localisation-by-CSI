@@ -1,0 +1,5 @@
+# Versions installed on the machine used for this project (Python 3.13.9, CPU-only torch)
+numpy==2.2.6
+scipy==1.17.0
+torch==2.15.0
+matplotlib==3.10.8

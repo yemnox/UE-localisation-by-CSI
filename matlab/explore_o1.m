@@ -1,6 +1,7 @@
 %% explore_o1.m - look at the O1 3.5 GHz v4 scenario before generating CSI
 clear; clc; close all;
-scen    = fullfile(pwd, 'o1_3p5');
+root    = fileparts(fileparts(mfilename('fullpath')));   % repo root
+scen    = fullfile(root, 'data', 'o1_3p5');
 tx_sets = 3:20;                       % the 18 base stations (t003..t020)
 
 % --- base station positions

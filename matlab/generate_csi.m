@@ -1,11 +1,12 @@
 %% generate_csi.m - build CSI tensors (antennas x subcarriers) from DeepMIMO v4 paths
-% Run from: C:\Users\LENOVO\Desktop\RT5\5G\UE localisation
-% Output  : csi_o1.mat  with H (N x 32 x 32 complex), pos (N x 3), los (N x 1)
+% Run from anywhere; paths are resolved from the repo root.
+% Output  : data/csi_o1.mat  with H (N x 32 x 32 complex), pos (N x 3), los (N x 1)
 clear; clc; close all;
-scen = fullfile(pwd, 'o1_3p5');
+root = fileparts(fileparts(mfilename('fullpath')));   % repo root
+scen = fullfile(root, 'data', 'o1_3p5');
 
 %% ---------------- CONFIG (adjust after running explore_o1.m) ----------------
-TX        = 6;                       % base station tx set (t005); pick from the map
+TX        = 6;                       % base station tx set (t006); pick from the map
 GRID      = 0;                       % user grid r000
 BOX       = [-inf inf 400 800];     % [xmin xmax ymin ymax] crop in metres
 MAX_USERS = 30000;                   % random subsample of the valid users
@@ -84,8 +85,9 @@ cfg    = struct('scenario','o1_3p5', 'tx_set',TX, 'grid',GRID, 'n_ant',N_ANT, ..
                 'n_sub',N_SUB, 'bw',BW, 'n_paths',N_PATHS, 'fc',3.5e9);
 
 fprintf('H: %s   pos: %s   LoS users: %.1f%%\n', mat2str(size(H)), mat2str(size(pos)), 100*mean(los));
-save('csi_o1.mat', 'H', 'pos', 'los', 'bs_pos', 'cfg', '-v7');
-fprintf('Saved csi_o1.mat\n');
+out = fullfile(root, 'data', 'csi_o1.mat');
+save(out, 'H', 'pos', 'los', 'bs_pos', 'cfg', '-v7');
+fprintf('Saved %s\n', out);
 
 %% ---- sanity figures (reusable in the article / slides)
 rx_dB = 10*log10(squeeze(sum(sum(abs(H).^2, 2), 3)));

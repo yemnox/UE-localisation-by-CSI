@@ -1,6 +1,7 @@
 %% plot_csi.m - CSI "images" of a near user and a far user, square pixels
-% Run from the "UE localisation" folder after generate_csi.m
-load('csi_o1.mat', 'H', 'pos', 'bs_pos');
+% Run after generate_csi.m (from any folder)
+root = fileparts(fileparts(mfilename('fullpath')));   % repo root
+load(fullfile(root, 'data', 'csi_o1.mat'), 'H', 'pos', 'bs_pos');
 dist = hypot(double(pos(:,1)) - bs_pos(1), double(pos(:,2)) - bs_pos(2));
 [~, near] = min(abs(dist - 20));      % user ~20 m from the BS
 [~, far]  = min(abs(dist - 150));     % user ~150 m from the BS
@@ -17,4 +18,4 @@ for r = 1:2
     xlabel('subcarrier'); ylabel('antenna');
 end
 colormap(parula);
-exportgraphics(gcf, 'csi_images.png', 'Resolution', 200);
+exportgraphics(gcf, fullfile(root, 'figs', 'csi_images.png'), 'Resolution', 200);
