@@ -13,7 +13,7 @@ MAX_USERS = 30000;                   % random subsample of the valid users
 N_ANT     = 32;                      % BS ULA elements, half-wavelength spacing
 N_SUB     = 32;                      % OFDM subcarriers
 BW        = 50e6;                    % bandwidth (Hz)
-N_PATHS   = 20;                      % strongest paths kept per user
+N_PATHS   = 18;                      % strongest paths kept per user
 rng(0);                              % reproducible subsampling
 %% ---------------------------------------------------------------------------
 
