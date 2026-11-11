@@ -17,3 +17,6 @@ __pycache__/
 *.asv
 Thumbs.db
 .DS_Store
+
+#report
+report*

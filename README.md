@@ -17,6 +17,13 @@ reach similar mean errors (CNN 5.06 m, ViT 5.45 m). A hybrid model, which uses a
 convolutional stem followed by the same transformer, reaches **2.33 ± 0.05 m**
 and has the fewest large errors.
 
+A second study keeps everything fixed except the number of propagation paths in
+the CSI (1, 3 or 18). The number of paths barely changes the median error. What
+it changes is the share of large north/south mirror errors: with 3 paths these
+are frequent, and the mean error is the worst of the three datasets. With a
+single path the ViT has the lowest mean error (2.23 ± 0.65 m) but is the least
+robust to noise.
+
 *Course: Futurs Réseaux Radio Mobiles, INSAT RT5, Project 03 (solo project).*
 
 ---
@@ -29,6 +36,7 @@ and has the fewest large errors.
 - [How to reproduce](#how-to-reproduce)
 - [Results](#results)
 - [Extension: hybrid CNN-Transformer](#extension-hybrid-cnn-transformer)
+- [Extension: impact of multipath richness](#extension-impact-of-multipath-richness)
 - [Limitations and future work](#limitations-and-future-work)
 - [Repository structure](#repository-structure)
 - [References](#references)
@@ -154,7 +162,9 @@ strongest paths. With a single path, |H| is constant across antennas and
 subcarriers. The received power falls smoothly with distance, and the only
 position information is in the linear phase ramps. With 3 paths, the paths
 interfere and produce fringes in |H|. The power map shows rings around the gNB.
-These are the patterns the models learn from.
+These are the patterns the models learn from. The
+[multipath study](#extension-impact-of-multipath-richness) measures how they
+affect localization.
 
 | 1 path | 3 paths |
 |---|---|
@@ -169,6 +179,7 @@ Instructions for downloading the scenario are in [data/README.md](data/README.md
 2. **MATLAB** (any working folder; paths are resolved from the repository root):
    - `matlab/explore_o1.m` (optional): prints units and value ranges and draws the layout.
    - `matlab/generate_csi.m`: writes `data/csi_o1.mat`.
+   - For the multipath study, run `generate_csi.m` with `N_PATHS = 1`, `3` and `18`. The script always saves to `csi_o1.mat`, so rename the output after each run to `csi_o1_1path.mat`, `csi_o1_3paths.mat` and `csi_o1_18paths.mat`. The 18-path file holds the same channel as the one used in the main study.
    - `matlab/plot_csi.m` and `matlab/plot_rays.m` (optional): write `figs/csi_images.png` and `figs/rays.png`.
      `plot_rays.m` loads `inter_pos` (~400 MB) and needs a few GB of RAM.
    - The MATLAB runtimes were not measured.
@@ -183,6 +194,14 @@ Instructions for downloading the scenario are in [data/README.md](data/README.md
    To run locally:
    - `pip install -r requirements.txt h5py`. The data-loading cell imports `h5py`.
    - Put `csi_o1.mat` in the notebook's working directory. Outputs are written to `results/` and `results/figs/`, relative to that directory.
+4. **Multipath notebook** (`notebooks/multipath_study.ipynb`, also run on a Colab T4):
+   - Upload the three `.mat` files to `/content/`, or set `DATA_DIR`.
+   - Run all cells.
+
+   Outputs go to `/content/csi_multipath/`: `results_multipath.json` and `figs/`.
+   They were copied to `results/` and `figs/results/` (the `mp_*` figures).
+
+   To run locally, the notebook reads the three files from its working directory and writes to `results_multipath/`.
 
 Measured training times on a T4 (from the notebook output):
 
@@ -192,9 +211,10 @@ Measured training times on a T4 (from the notebook output):
 | Training-set size (25 % and 50 %, seed 0) | 8 | 639 s (~11 min) |
 | CNN learning-rate check (seed 0) | 2 | 206 s (~3 min) |
 | Extension: hybrid model (Re/Im, 3 seeds) | 3 | 947 s (~16 min) |
-| **Total training** | 25 | **~67 min** |
+| **Total, main notebook** | 25 | **~67 min** |
+| Multipath notebook (3 datasets × 2 models × 3 seeds) | 18 | 3,287 s (~55 min) |
 
-Times per run: CNN 91–103 s, ViT about 274 s, hybrid 305–321 s.
+Times per run: CNN 91–103 s, ViT 266–274 s, hybrid 305–321 s.
 
 Three switches in the first code cell control what runs:
 - `FAST = True` runs 2 epochs and 1 seed, as a quick end-to-end check.
@@ -347,6 +367,116 @@ Re/Im input, mean ± std over 3 seeds:
 - The hybrid's results are also much more consistent across seeds (std 0.05 m on the mean, against 0.44 m for the ViT).
 - Under noise, the hybrid and the ViT are similar. The hybrid is slightly better at 5 dB and slightly worse at 10 and 15 dB.
 
+## Extension: impact of multipath richness
+
+Notebook: `notebooks/multipath_study.ipynb`. Results: `results/results_multipath.json`.
+
+**Setup.** Three datasets are generated with `generate_csi.m`, keeping the
+`N_PATHS` strongest paths per user:
+
+| Dataset | Paths kept | Description |
+|---|---|---|
+| 1 path | 1 | strongest path only: an artificial channel with no reflections |
+| 3 paths | 3 | strongest path + the 2 strongest reflections |
+| 18 paths | all (≤ 17 stored) | the realistic channel of the main study |
+
+Everything else is identical across the three datasets:
+- The same 30,000 users. The notebook asserts that positions match across the three files.
+- The same split, Re/Im input, CNN and ViT architectures and training settings.
+- Seeds 0, 1 and 2.
+
+The global scale is computed separately on each dataset's training set.
+
+![Multipath CSI images](figs/results/mp_csi_images.png)
+*The same two users (20 m and 150 m from the gNB) in the three datasets. With 1 path, |H| is flat: its variation is below 10⁻⁶ of its value. Re(H) then only shows the linear phase ramps. With 3 and 18 paths, |H| shows fading bands. The 3-path and 18-path images are very close, so the two strongest reflections carry most of the structure.*
+
+![Channel statistics](figs/results/mp_channel_stats.png)
+*Left: amplitude variation across the 32 × 32 matrix (std/mean of |H|) for every user. It is zero with 1 path, and spreads up to about 0.6 with 3 and 18 paths. Right: received power vs distance. With 1 path it decreases smoothly, so it maps one-to-one to distance. With 3 and 18 paths, interference adds ripples of several dB, so the same power level occurs at several distances.*
+
+### Accuracy (mean ± std over 3 seeds)
+
+| Paths | Model | Mean (m) | Median (m) | P90 (m) | RMSE (m) | Errors > 50 m (%) |
+|---|---|---|---|---|---|---|
+| 1 | CNN | 5.63 ± 0.41 | 2.53 ± 0.36 | 7.38 ± 1.54 | 18.25 ± 4.54 | 1.74 ± 0.39 |
+| 1 | ViT | **2.23 ± 0.65** | **1.47 ± 0.37** | **3.74 ± 0.49** | **8.16 ± 4.94** | **0.15 ± 0.12** |
+| 3 | CNN | 10.17 ± 0.49 | 2.50 ± 0.19 | 6.67 ± 0.19 | 47.47 ± 3.16 | 2.55 ± 0.04 |
+| 3 | ViT | 6.46 ± 0.98 | 1.51 ± 0.23 | 4.21 ± 0.31 | 39.06 ± 4.58 | 1.41 ± 0.23 |
+| 18 | CNN | 4.43 ± 0.35 | 2.48 ± 0.23 | 6.30 ± 0.60 | 18.33 ± 0.63 | 0.68 ± 0.03 |
+| 18 | ViT | 2.89 ± 0.44 | 1.64 ± 0.13 | 4.05 ± 0.08 | 14.63 ± 4.86 | 0.35 ± 0.18 |
+
+![Errors vs number of paths](figs/results/mp_errors_vs_paths.png)
+
+- **The ViT beats the CNN on every dataset and every metric.**
+- **The median error hardly depends on the number of paths.** It is 2.48–2.53 m for the CNN and 1.47–1.64 m for the ViT, and the differences are within one std.
+- **The mean error depends mostly on large errors.**
+  - The 3-path dataset has the most errors over 50 m (2.55 % for the CNN, 1.41 % for the ViT). Its mean and RMSE are therefore the worst, even though its median is as good as the others.
+  - Going from 3 to 18 paths brings the large errors back down.
+- **With 1 path, the ViT has the lowest mean error and the fewest large errors.** The CNN does worse with 1 path than with 18. A likely reason: with a single path, received power is a clean, monotonic distance cue and the phase ramps give the angle, and the ViT uses this better.
+- **The validation curves rank the datasets differently.** On the validation zones, the seed-0 ViT is best with 18 paths (3.73 m), then 3 paths (4.78 m), then 1 path (6.80 m) (see the learning curves below). On the test zones the 1-path ViT is best. The 1-path advantage on the test set is therefore not consistent across held-out zones, and should not be read as "fewer paths is better".
+
+![Multipath CDF](figs/results/mp_cdf.png)
+*Error CDF, zoomed to 0–15 m (seed 0), for the CNN (left) and the ViT (right).*
+
+![Error vs distance](figs/results/mp_error_vs_distance.png)
+*Median error per 20 m distance bin (seed 0). Median error grows with distance from the gNB for every dataset. For the ViT, the 1-path model has the lowest median in almost every bin beyond 25 m. For the CNN, the 1-path model is worst within 20 m of the gNB (about 4 m) and lowest or close to lowest in most bins beyond that.*
+
+![Multipath error maps](figs/results/mp_error_maps.png)
+*Error for each test user (seed 0, colour capped at 7.3 m). The high-error areas are the far ends of the street (y ≈ 425 m and y ≈ 775 m) and, for the CNN, around y ≈ 525 m. The ViT with 1 path has the most uniform map.*
+
+### Large errors and mirror confusions (seed 0)
+
+| Paths | Model | Errors > 50 m | Of these, on the wrong side of the gNB |
+|---|---|---|---|
+| 1 | CNN | 128 (2.11 %) | 34 % |
+| 1 | ViT | 1 (0.02 %) | 0 % |
+| 3 | CNN | 156 (2.57 %) | 81 % |
+| 3 | ViT | 104 (1.72 %) | 91 % |
+| 18 | CNN | 43 (0.71 %) | 56 % |
+| 18 | ViT | 7 (0.12 %) | 57 % |
+
+![Gross errors](figs/results/mp_gross_errors.png)
+
+With 3 paths, 81–91 % of the large errors are north/south mirror confusions, the
+endfire ambiguity described in [Outliers](#outliers). With 1 path, the ViT makes
+almost no such errors. A plausible explanation is that the single path's
+smooth power-vs-distance curve and clean phase ramps leave little room for
+confusion. With 3 paths, the ripples in power and the extra fringes give similar
+fingerprints on both sides of the gNB. With 18 paths, the weaker reflections add
+detail that separates the two sides again. This interpretation is not tested
+directly in the notebook.
+
+### Robustness to noise (test-time AWGN, seed 0)
+
+Mean error (m):
+
+| Paths | Model | 0 dB | 5 dB | 10 dB | 15 dB | 20 dB | 30 dB |
+|---|---|---|---|---|---|---|---|
+| 1 | CNN | 51.92 | 26.47 | 13.57 | 8.27 | 6.51 | 5.90 |
+| 1 | ViT | 80.64 | 55.63 | 21.11 | 5.95 | 2.56 | 1.59 |
+| 3 | CNN | 42.37 | 17.93 | 13.07 | 11.22 | 10.84 | 10.74 |
+| 3 | ViT | 48.30 | 17.54 | 9.24 | 7.82 | 7.83 | 7.77 |
+| 18 | CNN | 49.09 | 18.40 | 6.55 | 4.62 | 4.72 | 4.84 |
+| 18 | ViT | 52.33 | 20.07 | 5.25 | 2.49 | 2.32 | 2.29 |
+
+![Multipath SNR](figs/results/mp_snr.png)
+
+- **The 1-path ViT is the most accurate model at 30 dB and the most fragile under noise.**
+  - Its error grows from 1.59 m at 30 dB to 5.95 m at 15 dB, and to 21.1 m at 10 dB.
+  - At 5 dB and 0 dB it is the worst of all six models.
+  - With one path, the only information is the smooth phase ramps and the power level, and noise corrupts both.
+- **The 18-path models are the most robust.** They stay close to their noiseless error down to 15 dB and have the lowest error at 10 dB.
+- **The 3-path models are flat from 30 dB down to 10–15 dB**, but at a high level (about 7.8 m for the ViT and 10.8 m for the CNN), set by their large errors.
+
+![Multipath learning curves](figs/results/mp_learning_curves.png)
+*Validation mean error per epoch (seed 0). For the ViT, 18 paths converges lowest and 1 path highest. The CNN curves are close together and noisy.*
+
+**Run-to-run variation of the CNN.** The 18-path setting matches the Re/Im setting
+of the main study: same data, seeds and hyper-parameters. The ViT results are
+identical in both notebooks (2.89 ± 0.44 m). The CNN results are not: 4.43 ± 0.35 m
+here, against 6.35 ± 1.12 m in the main notebook. GPU convolution kernels are not
+deterministic by default, and this CNN appears sensitive to that. CNN
+differences of 1–2 m between runs should therefore be treated as noise.
+
 ## Limitations and future work
 
 **Limitations**
@@ -358,6 +488,8 @@ Re/Im input, mean ± std over 3 seeds:
 - The array is a ULA aligned with the street rather than a sectorised UPA, which causes the north/south ambiguity described above.
 - The models were trained on noiseless CSI, with no noise augmentation.
 - Only 3 seeds are used for the main results. The noise, training-set-size, outlier and learning-rate studies use seed 0 only.
+- Training on GPU is not bit-reproducible: the CNN gives different results for the same seed in the two notebooks (see the multipath section).
+- Validation and test zones can rank configurations differently (for example the 1-path vs 18-path ViT), so conclusions drawn from a single test split are fragile.
 
 **Future work**
 
@@ -366,6 +498,8 @@ Re/Im input, mean ± std over 3 seeds:
 - Use a UPA or an array not aligned with the street to remove the endfire ambiguity.
 - Simulate more realistic SRS configurations (more subcarriers, comb structure) and timing offsets.
 - Run all studies over several seeds and test other input encodings, for example log-amplitude, or phase differences between neighbouring antennas.
+- Use cross-validation over the spatial blocks (rotating which blocks are test and validation) to check whether the multipath ranking holds.
+- Enable deterministic GPU kernels (`torch.use_deterministic_algorithms(True)`) so that runs can be reproduced exactly.
 
 ## Repository structure
 
@@ -381,17 +515,21 @@ Re/Im input, mean ± std over 3 seeds:
 │   ├── plot_csi.m         CSI images of a near and a far user
 │   └── plot_rays.m        3D ray-traced paths for two users
 ├── notebooks/
-│   └── csi_localization_final.ipynb   split, encodings, CNN, ViT, hybrid, evaluation
+│   ├── csi_localization_final.ipynb   split, encodings, CNN, ViT, hybrid, evaluation
+│   └── multipath_study.ipynb          1 / 3 / 18 paths, CNN and ViT
 ├── data/                  (contents gitignored)
 │   ├── README.md          how to get o1_3p5 and generate csi_o1.mat
 │   ├── o1_3p5/            DeepMIMO scenario (~21 GB)
-│   └── csi_o1.mat         generated dataset (~218 MB)
+│   ├── csi_o1_1path.mat   CSI with the strongest path only
+│   ├── csi_o1_3paths.mat  CSI with the 3 strongest paths
+│   └── csi_o1_18paths.mat CSI with all paths (= csi_o1.mat of the main study, ~218 MB)
 ├── results/
-│   ├── results.json       all metrics (per seed, mean ± std), outliers, SNR, data size, LR check, hybrid
-│   └── models.pt          seed-0 weights of the 4 (input, model) pairs (6.8 MB)
+│   ├── results.json             main study: metrics (per seed, mean ± std), outliers, SNR, data size, LR check, hybrid
+│   ├── results_multipath.json   multipath study: metrics, gross errors, SNR
+│   └── models.pt                seed-0 weights of the 4 (input, model) pairs of the main study (6.8 MB)
 ├── figs/
 │   ├── matlab/            scenario layout, rays, CSI images, 1-path / 3-path sanity plots
-│   └── results/           notebook figures
+│   └── results/           notebook figures (mp_* = multipath study)
 └── docs/
     └── resources.md       learning resources (videos)
 ```
